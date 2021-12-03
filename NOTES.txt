@@ -1,0 +1,2 @@
+- frontend/select.html has a callback prefix hardcoded to localhost:1294
+- schema is hardcoded for tooltips, not read from current database

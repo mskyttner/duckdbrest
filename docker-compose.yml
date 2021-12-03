@@ -1,0 +1,13 @@
+version: '3.7'
+
+services:
+  rest:
+    image: duckdbrest
+    ports:
+      - "1294:1294"
+
+  gotty:
+    image: duckdbrest
+    ports:
+      - "8080:1294"
+    command: sh -c "duckdb myduck.db 'select 42' && gotty --port ${PORT:-1294} --permit-write --reconnect duckdb"
