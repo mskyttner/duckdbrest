@@ -20,6 +20,8 @@ RUN wget -O cli.zip "https://github.com/duckdb/duckdb/releases/download/v0.3.1/d
 WORKDIR /data
 
 RUN duckdb myduck.db 'CALL dbgen(sf=0.1)'
+RUN duckdb myduck.db 'select 42;'
+
 
 #RUN apt install -y git
 #RUN git clone https://github.com/duckdb/duckdb.git
@@ -36,8 +38,13 @@ RUN wget $GOTTY_BINARY -O gotty.tar.gz && \
 
 COPY .gotty /root/.gotty
 
+RUN apt install -y socat jq
+
+COPY bash-cli-api /bash-cli-api
+
 VOLUME ["/data"]
 EXPOSE 1294
 
 CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
-#CMD sh -c "duckdb myduck.db 'select 42' && gotty --port ${PORT:-1294} --permit-write --reconnect duckdb"
+#CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
+#CMD bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"

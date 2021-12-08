@@ -10,4 +10,11 @@ services:
     image: duckdbrest
     ports:
       - "8080:1294"
-    command: sh -c "duckdb myduck.db 'select 42' && gotty --port ${PORT:-1294} --permit-write --reconnect duckdb"
+    command: sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
+
+  bashapi:
+    image: duckdbrest
+    ports:
+      - "8181:8181"
+    command: bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"
+
