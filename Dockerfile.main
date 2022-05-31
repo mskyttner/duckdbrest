@@ -1,0 +1,131 @@
+# syntax=docker/dockerfile:1.4
+FROM docker.io/ubuntu:20.04 AS build
+
+ENV TZ=Europe/Stockholm
+ENV DEBIAN_FRONTEND=noninteractive
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update -y && apt-get install -y --no-install-recommends \
+	build-essential \
+	cmake \
+	ccache \
+	ninja-build \
+	git \
+	ca-certificates \
+	openssl \
+	libssl-dev
+
+WORKDIR /
+
+RUN git clone --depth=1 https://github.com/duckdb/duckdb
+
+WORKDIR /duckdb
+
+ENV CCACHE_DIR=/ccache
+
+# use ccache (make it appear in path before /usr/bin/gcc etc)
+RUN for p in gcc g++ cc c++; do ln -vs /usr/bin/ccache /usr/local/bin/$p;  done
+
+RUN --mount=type=cache,target=/ccache/ N_CPU=$((`nproc --all`-1)) && \
+	echo "Number of CPUs: $N_CPU" && \
+	BUILD_REST=1 \
+	BUILD_SHELL=1 \
+	GEN=ninja \
+	BUILD_VISUALIZER=0 \
+	BUILD_ICU=0 \
+	BUILD_TPCH=1 \
+	BUILD_TPCDS=1 \
+	BUILD_FTS=1 \
+	BUILD_HTTPFS=1 \
+	BUILD_JSON=1 \
+	BUILD_EXCEL=1 \
+	BUILD_SUBSTRAIT_EXTENSION=1 \
+	TREAT_WARNINGS_AS_ERRORS=0 \
+	FORCE_WARN_UNUSED=1 \
+	STATIC_OPENSSL=1 \
+	DISABLE_BUILTIN_EXTENSIONS=1 \
+	OPENSSL_ROOT_DIR=/usr/local/ssl \
+	make -j$N_CPU
+
+RUN --mount=type=cache,target=/ccache/ ccache -s
+
+
+# next build stage
+
+FROM docker.io/ubuntu:20.04
+
+ENV TZ=Europe/Stockholm
+ENV DEBIAN_FRONTEND=noninteractive
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# copy binaries from previous stage
+COPY --from=build /duckdb/build/release /tmp
+WORKDIR /usr/local/bin
+RUN cp /tmp/duckdb . && \
+	cp /tmp/tools/rest/duckdb_rest_server . 
+
+# make extensions installable using "load '/extensions/fts.duckdb_extension';"
+RUN mkdir -p /extensions && \
+	find /tmp -type f -name \*.duckdb_extension | xargs cp -t /extensions
+
+WORKDIR /data
+VOLUME ["/data"]
+
+# add gotty, mc, example data, duckdb_rest_server frontend etc
+RUN apt update && apt install -y --no-install-recommends \
+	wget \
+	ca-certificates \
+	unzip \
+	procps
+
+# sysdeps needed for bash-cli-api experiment
+RUN apt install -y --no-install-recommends \
+	socat \
+	jq \
+	gettext \
+	perl \
+	make \
+	shared-mime-info 
+
+RUN cpan File::MimeInfo::Magic
+
+# generate some example data
+RUN duckdb myduck.db "load '/extensions/tpch.duckdb_extension'; call dbgen(sf=0.1);"
+RUN duckdb myduck.db 'select 42;'
+RUN duckdb myduck.db 'load "/extensions/httpfs.duckdb_extension";'
+
+COPY frontend frontend
+
+# gotty service for duckdb CLI
+ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
+#ENV GOTTY_BINARY https://github.com/sorenisanerd/gotty/releases/download/latest/gotty_latest-1-gb63ea16_linux_amd64.tar.gz
+
+RUN wget $GOTTY_BINARY -O gotty.tar.gz && \
+    tar -xzf gotty.tar.gz -C /usr/local/bin/ && \
+    rm gotty.tar.gz && \
+    chmod +x /usr/local/bin/gotty
+
+COPY .gotty /root/.gotty
+
+# experimental bash CLI API (not for the faint of heart)
+COPY bash-cli-api /bash-cli-api
+
+# yet another experimental shell server
+COPY sherver /sherver
+
+# install minio client
+RUN apt-get install -y --no-install-recommends \
+	ca-certificates
+
+RUN cd /usr/local/bin && \
+  wget -q --show-progress https://dl.min.io/client/mc/release/linux-amd64/mc && \
+  chmod +x mc
+
+EXPOSE 1294
+
+CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
+
+# to start the experimental servers, use one of these commands in your docker-compose.yml file
+#CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
+#CMD bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"
+
