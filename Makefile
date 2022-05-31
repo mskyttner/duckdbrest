@@ -12,7 +12,8 @@ csvquote:
 	#cd scratch/csvquote && cat ../../example.csv | ./csvquote > ../../example-quoted.csv
 
 build:
-	docker build -t duckdbrest .
+	#docker build -t duckdbrest .
+	docker build --progress=plain -t duckdbrest -f Dockerfile.main .
 
 dbgen:
 	duckdb myduck.db 'CALL dbgen(sf=0.1)'

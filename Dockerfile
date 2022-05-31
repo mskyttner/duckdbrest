@@ -54,7 +54,8 @@ RUN duckdb myduck.db 'load "httpfs";'
 COPY frontend frontend
 
 # gotty service for duckdb CLI
-ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
+#ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
+ENV GOTTY_BINARY https://github.com/sorenisanerd/gotty/releases/download/latest/gotty_latest-1-gb63ea16_linux_amd64.tar.gz
 
 RUN wget $GOTTY_BINARY -O gotty.tar.gz && \
     tar -xzf gotty.tar.gz -C /usr/local/bin/ && \
@@ -81,6 +82,11 @@ RUN apt-get install -y --no-install-recommends \
 RUN cd /usr/local/bin && \
   wget -q --show-progress https://dl.min.io/client/mc/release/linux-amd64/mc && \
   chmod +x mc
+
+RUN apt-get install -y --no-install-recommends \
+	fontconfig \
+	fonts-hack && \
+	fc-cache -f
 
 # to start the experimental servers, use one of these commands in your docker-compose.yml file
 #CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
