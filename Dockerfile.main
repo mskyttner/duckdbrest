@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/ccache/ N_CPU=$((`nproc --all`-1)) && \
 	TREAT_WARNINGS_AS_ERRORS=0 \
 	FORCE_WARN_UNUSED=1 \
 	STATIC_OPENSSL=1 \
-	DISABLE_BUILTIN_EXTENSIONS=1 \
+	DISABLE_BUILTIN_EXTENSIONS=0 \
 	OPENSSL_ROOT_DIR=/usr/local/ssl \
 	make -j$N_CPU
 

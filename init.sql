@@ -4,6 +4,7 @@ set s3_access_key_id='minioadmin';
 set s3_secret_access_key='minioadmin';
 set s3_use_ssl=false;
 set s3_region='';
+set s3_url_style='path';
 .timer on
 select count(*) from 's3://demo/*.parquet';
 .shell more init.sql
