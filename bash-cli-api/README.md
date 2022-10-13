@@ -6,5 +6,5 @@ Start the bash duckdb CLI server with a command pointing it to the database file
 
 You can then issue a request, for example:
 
-		curl -s "localhost:8181/api/duckdb?q=select%20*%20from%20lineitem%20limit%201;
+		curl -s "localhost:8181/api/duckdb?q=select%20*%20from%20lineitem%20limit%201;"
 

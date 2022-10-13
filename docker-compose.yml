@@ -1,29 +1,32 @@
 version: '3.7'
 
 services:
-  rest:
-    image: duckdbrest
-    ports:
-      - "1294:1294"
 
   gotty:
-    image: duckdbrest
+    image: duckdbrest:v0.5.1
     ports:
       - "8080:1294"
-    command: sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
+    command: sh -c "envsubst < /data/init.sql > ~/.duckdbrc && gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -unsigned -interactive myduck.db -readonly"
     environment:
-      - MC_HOST_ducks3=http://minioadmin:minioadmin@minio:9000
+      - MC_HOST_s3=http://minioadmin:minioadmin@minio:9000
+      - S3_ENDPOINT='minio:9000'
+      - S3_USER='minioadmin'
+      - S3_PASS='minioadmin'
+      - S3_USE_SSL=false
+      - S3_REGION=''
+      - S3_URL_STYLE='path'
+      - S3_BUCKET=demo
     volumes:
       - ./init.sql:/data/init.sql
 
   bashapi:
-    image: duckdbrest
+    image: duckdbrest:v0.5.1
     ports:
       - "8181:8181"
     command: bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"
 
   sherver:
-    image: duckdbrest
+    image: duckdbrest:v0.5.1
     ports:
       - "8282:8282"
     command: bash -c "cd /sherver && ./sherver.sh 8282 2> /proc/1/fd/1"
@@ -35,8 +38,25 @@ services:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
       - MINIO_API_SELECT_PARQUET=on
+      - MINIO_BROWSER_REDIRECT_URL=http://localhost/minio
     ports:
       - 9000:9000
       - 9001:9001
     volumes:
       - ./s3:/data
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./mitm.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - 80:80
+
+  postgres:
+    image: postgres:14.5-alpine
+    environment:
+      POSTGRES_DB: 'post'
+      POSTGRES_USER: 'post'
+      POSTGRES_PASSWORD: 'post'
+    ports:
+      - 5432:5432

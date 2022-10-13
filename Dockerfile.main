@@ -61,8 +61,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # copy binaries from previous stage
 COPY --from=build /duckdb/build/release /tmp
 WORKDIR /usr/local/bin
-RUN cp /tmp/duckdb . && \
-	cp /tmp/tools/rest/duckdb_rest_server . 
+RUN cp /tmp/duckdb .
+#RUN cp /tmp/duckdb . && \
+#	cp /tmp/tools/rest/duckdb_rest_server . 
 
 # make extensions installable using "load '/extensions/fts.duckdb_extension';"
 RUN mkdir -p /extensions && \
@@ -71,7 +72,7 @@ RUN mkdir -p /extensions && \
 WORKDIR /data
 VOLUME ["/data"]
 
-# add gotty, mc, example data, duckdb_rest_server frontend etc
+# add gotty, mc, example data etc
 RUN apt update && apt install -y --no-install-recommends \
 	wget \
 	ca-certificates \
@@ -90,11 +91,14 @@ RUN apt install -y --no-install-recommends \
 RUN cpan File::MimeInfo::Magic
 
 # generate some example data
-RUN duckdb myduck.db "load '/extensions/tpch.duckdb_extension'; call dbgen(sf=0.1);"
-RUN duckdb myduck.db 'select 42;'
-RUN duckdb myduck.db 'load "/extensions/httpfs.duckdb_extension";'
+RUN ls -lahtr /extensions
+RUN duckdb -unsigned myduck.db "load '/extensions/tpch.duckdb_extension'; call dbgen(sf=0.1); select 42; load '/extensions/httpfs.duckdb_extension';"
 
-COPY frontend frontend
+#RUN duckdb -unsigned myduck.db "load '/extensions/tpch.duckdb_extension'; call dbgen(sf=0.1);"
+#RUN duckdb -unsigned myduck.db 'select 42;'
+#RUN duckdb -unsigned myduck.db 'SET enable_external_access=true; load "/extensions/httpfs.duckdb_extension";'
+
+#COPY frontend frontend
 
 # gotty service for duckdb CLI
 ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
@@ -123,9 +127,9 @@ RUN cd /usr/local/bin && \
 
 EXPOSE 1294
 
-CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
+#CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
+CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -unsigned -interactive myduck.db -readonly"
 
 # to start the experimental servers, use one of these commands in your docker-compose.yml file
-#CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
 #CMD bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"
 

@@ -1,4 +1,4 @@
-ARG ver=v0.3.4
+ARG ver=v0.5.1
 
 FROM debian
 
@@ -28,10 +28,10 @@ WORKDIR /usr/local/bin
 ARG ver
 ENV DUCKDB_VER $ver
 
-RUN wget -O rest.zip "https://github.com/duckdb/duckdb/releases/download/$DUCKDB_VER/duckdb_rest-linux-amd64.zip" && \
-	unzip rest.zip && \
-	rm rest.zip && \
-	chmod +x duckdb_rest_server
+#RUN wget -O rest.zip "https://github.com/duckdb/duckdb/releases/download/$DUCKDB_VER/duckdb_rest-linux-amd64.zip" && \
+#	unzip rest.zip && \
+#	rm rest.zip && \
+#	chmod +x duckdb_rest_server
 
 RUN wget -O cli.zip "https://github.com/duckdb/duckdb/releases/download/$DUCKDB_VER/duckdb_cli-linux-amd64.zip" && \
 	unzip cli.zip && \
@@ -45,17 +45,21 @@ RUN duckdb myduck.db 'CALL dbgen(sf=0.1)'
 RUN duckdb myduck.db 'select 42;'
 RUN duckdb myduck.db 'install "httpfs";'
 RUN duckdb myduck.db 'load "httpfs";'
+RUN duckdb myduck.db 'install "postgres_scanner";'
+RUN duckdb myduck.db 'load "postgres_scanner";'
+RUN duckdb myduck.db 'install "sqlite_scanner";'
+RUN duckdb myduck.db 'load "sqlite_scanner";'
 
 # use a (sligthly) modified duckd rest server frontend
 #RUN apt install -y git
 #RUN git clone https://github.com/duckdb/duckdb.git
 #RUN cp -r duckdb/tools/rest/frontend .
 
-COPY frontend frontend
+#COPY frontend frontend
 
 # gotty service for duckdb CLI
-#ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
-ENV GOTTY_BINARY https://github.com/sorenisanerd/gotty/releases/download/latest/gotty_latest-1-gb63ea16_linux_amd64.tar.gz
+ENV GOTTY_BINARY https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_386.tar.gz
+#ENV GOTTY_BINARY https://github.com/sorenisanerd/gotty/releases/download/latest/gotty_latest-1-gb63ea16_linux_amd64.tar.gz
 
 RUN wget $GOTTY_BINARY -O gotty.tar.gz && \
     tar -xzf gotty.tar.gz -C /usr/local/bin/ && \
@@ -73,7 +77,9 @@ COPY sherver /sherver
 VOLUME ["/data"]
 EXPOSE 1294
 
-CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
+CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
+
+#CMD ["duckdb_rest_server", "--listen=0.0.0.0", "--port=1294", "--database=myduck.db", "--read_only", "--fetch_timeout=2", "--static=frontend", "--log=/proc/1/fd/1"]
 
 # install minio client
 RUN apt-get install -y --no-install-recommends \
@@ -88,6 +94,8 @@ RUN apt-get install -y --no-install-recommends \
 	fonts-hack && \
 	fc-cache -f
 
+RUN apt-get install -y --no-install-recommends \
+	libpq-dev
+
 # to start the experimental servers, use one of these commands in your docker-compose.yml file
-#CMD sh -c "gotty --port ${PORT:-1294} --permit-write --reconnect duckdb -interactive myduck.db -readonly"
 #CMD bash -c "cd /bash-cli-api && DDB_PATH=/data/myduck.db ./index.sh"
